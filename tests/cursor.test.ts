@@ -11,9 +11,9 @@ import { attach } from "../src/attach.ts";
 import { cursorFor } from "../src/cursor.ts";
 import { keybindings, theme, tui } from "./fixtures.ts";
 
-// Pi's software cursor right after the focus marker, as SGR 7 or an APC.
+// Pi's software cursor right after the focus marker, an APC.
 const SOFTWARE_CURSOR = new RegExp(
-  `${CURSOR_MARKER.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}(?:\x1b\\[7m|\x1b_pi:fc\x07)`,
+  `${CURSOR_MARKER.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}\x1b_pi:fc\x07`,
 );
 
 function setup() {

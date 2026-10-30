@@ -1,9 +1,9 @@
 import { CURSOR_MARKER, type TUI } from "@earendil-works/pi-tui";
 import type { Mode } from "./engine.js";
 
-// Pi's fake cursor opener right after the focus marker: SGR 7 or an APC.
+// Pi's fake cursor opener right after the focus marker, an APC.
 const FAKE_CURSOR = new RegExp(
-  `${CURSOR_MARKER.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}(?:\x1b\\[7m|\x1b_pi:fc\x07)`,
+  `${CURSOR_MARKER.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}\x1b_pi:fc\x07`,
 );
 
 export type Cursor = {
@@ -95,7 +95,7 @@ export function cursorFor(editor: object, tui: TUI): Cursor | undefined {
       }
       // Pi draws a fake inverse cursor even with the hardware cursor enabled.
       // Remove only its opening code, keeping the marker, cell, and closing
-      // code. Pi 1.1 opens it with SGR 7; Pi 1.2 opens it with an APC marker.
+      // code.
       // Visual highlighting is applied afterward by the editor decorator.
       for (let i = 0; i < lines.length; i++)
         lines[i] = lines[i].replace(FAKE_CURSOR, CURSOR_MARKER);
