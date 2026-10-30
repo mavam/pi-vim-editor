@@ -133,6 +133,7 @@ src/
 ├── sentence.ts   # PURE: sentence motions and objects
 ├── paragraph.ts  # PURE: paragraph motions and objects
 ├── reflow.ts     # PURE: manual whole-line prose wrapping and cursor tracking
+├── screen.ts     # PURE: screen-row motions over wrapped rows
 ├── text.ts       # PURE: graphemes, word classes, paste-marker spans
 └── port.ts       # editor capability adapter (§6)
 ```
@@ -228,6 +229,8 @@ interface Port {
   paste(content: string): string;    // private: a new pasted block, for `.`
   cancelJump(): void;                // private, optional: jumpMode = null
   layout?(width: number): Layout;    // private, optional: see §6.1
+  rows?(): Row[];                    // private, optional: see §6.1
+  view?(): View;                     // private, optional, scrolls: see §6.1
 }
 ```
 
@@ -242,8 +245,9 @@ Rules:
   expected type (`state`, `pastes`, `lastAction`, `undoStack.length/pop/push`,
   and the private methods above). If any is missing, we don't attach and
   notify once that the Pi version is unsupported. No degraded tiers, no
-  synthetic keys. `layout` and `cancelJump` are optional: without them, Visual
-  mode is off, and Esc doesn't end a pending `Ctrl-]` jump.
+  synthetic keys. `layout`, `rows`, `view`, and `cancelJump` are optional:
+  without them, Visual mode is off, screen motions treat lines as rows, `H`,
+  `M`, and `L` do nothing, and Esc doesn't end a pending `Ctrl-]` jump.
 - **Esc goes through the port, not through Pi's keys.** With autocomplete open,
   Esc closes it with `closeAutocomplete()`, so a remapped `tui.select.cancel`
   can't trap it. Every Esc we handle also ends Pi's pending character jump,
@@ -308,7 +312,22 @@ into the selection; the terminal cursor still shows it if Pi uses one. An empty
 line in the selection shows one highlighted cell.
 
 `layout` is optional: if those members are missing, `v` and `V` notify that
-Visual mode isn't supported and everything else keeps working. Upstream ask #4
+Visual mode isn't supported and everything else keeps working.
+
+Screen motions read the same private members. `gj`, `g$`, and the other row
+motions use `port.rows()`: `buildVisualLineMap(lastWidth)`, the map Pi's own
+arrow keys move through. `lastWidth` is the width Pi wrapped at, so an editor
+that renders Pi's rows narrower still gets the right rows. Without those
+members, each line is one row.
+
+`H`, `M`, and `L` need to know what's on screen, so they use `port.view()`
+only when the last render passed the same border check as the highlight;
+otherwise they do nothing. The text or cursor may have changed since that
+render, so `view()` redoes `Editor.render()`'s scrolling: the capacity of
+`max(5, ⌊0.3 · terminal rows⌋)` rows, scrolled from `scrollOffset` to the
+cursor's row and clamped. It writes the result back to `scrollOffset`, so
+several motions before the next render agree with each other and with what
+that render shows. Upstream ask #4
 would replace this with an editor API for highlighting ranges.
 
 ### Upstream asks

@@ -116,6 +116,9 @@ export function attach(
   const bottom = target.renderBottomBorder.bind(editor);
   const render = target.render.bind(editor);
   let state: State = initial;
+  // Whether the last render showed Pi's rows unchanged, so `port.view` is
+  // what's on screen.
+  let shown = false;
   let seen = "";
   // The text as the last undo or redo left it.
   let undone = "";
@@ -207,7 +210,13 @@ export function attach(
   const perform = (key: string) => {
     const depth = port.undoDepth();
     const before = state;
-    const buf = { ...port.read(), textWidth: shared.textWidth };
+    const buf: Buffer = {
+      ...port.read(),
+      textWidth: shared.textWidth,
+      rows: port.rows,
+      // Only a view verified at the last render tells what's visible.
+      view: shown ? port.view : undefined,
+    };
     const result = press(state, key, buf, shared.register, {
       unnamed: shared.unnamed,
     });
@@ -635,11 +644,11 @@ export function attach(
     borders = {};
     const lines = render(width);
     renderCursor?.(state.mode, lines);
-    if (!isVisual(state.mode)) return lines;
-    const buf = port.read();
     const layout = port.layout?.(width);
-    if (layout && native(lines, width, layout, borders))
-      highlight(lines, buf.lines, selectedSpans(state, buf), layout);
+    shown = !!layout && native(lines, width, layout, borders);
+    if (!isVisual(state.mode) || !layout || !shown) return lines;
+    const buf = port.read();
+    highlight(lines, buf.lines, selectedSpans(state, buf), layout);
     return lines;
   };
 

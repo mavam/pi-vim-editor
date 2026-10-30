@@ -45,9 +45,9 @@ search** below.
 
 ## 4. NORMAL mode (v0.1)
 
-Counts: `{n}` works on the motions `h j k l w b e W B E f F t T ; , $ ( )`,
+Counts: `{n}` works on the motions `h j k l w b e W B E f F t T ; , $ ( ) H L`,
 on `/`, `?`, `n`, `N`, on
-`{n}G` / `{n}gg`, `ge` / `gE`, on operators (`2dd`, `3cw`, `y3j`; `2d3w`
+`{n}G` / `{n}gg`, `ge` / `gE`, `gj` / `gk` / `g$`, on operators (`2dd`, `3cw`, `y3j`; `2d3w`
 deletes six words), on word, sentence, and paragraph objects (`2diw`, `d3aW`,
 `d2as`, `d2ap`), and on `x`, `X`, `s`,
 `S`, `C`, `D`, `J`, `~`, `r`, `p`, `P`, and `.`. Not on quote or bracket
@@ -85,6 +85,9 @@ never restores over one.
 | `W` `B` `E` | Same for WORDs (whitespace-delimited) |
 | `ge` `gE` | Back to the end of the previous word / WORD |
 | `0` `^` `$` | Line start / first non-blank / last character |
+| `gj` `gk` | Screen row down / up through wrapped lines, keeping the display column; no-op at the last / first row |
+| `g0` `g^` `g$` | Start / first non-blank / last character of the screen row |
+| `H` `M` `L` | First non-blank of the top / middle / bottom visible row |
 | `gg` `G` `{n}G` | First line / last line / line n |
 | `%` | From the first bracket at or after the cursor on the line, to its partner, across lines |
 | `(` `)` | Back / forward to the start of a sentence, across lines; see below |
@@ -93,6 +96,22 @@ never restores over one.
 | `;` `,` | Repeat the last `f F t T` / in reverse |
 
 Paste markers (`[paste #1 +24 lines]`) count as one character.
+
+Screen rows are the rows Pi wraps the prompt into at its current width, as
+the arrow keys use them. `gj` and `gk` are exclusive and characterwise, so
+`dgj` deletes up to the same column one row down; `g$` is inclusive. A count
+past the first or last row moves as far as it can, but an operator then does
+nothing (`d9gj`); `{n}g$` still reaches the last row's end. A wrapped paste
+marker's inner rows are skipped. On a row of only blanks, `g^` goes to its
+last blank, as `H`, `M`, and `L` do.
+
+`{n}H` and `{n}L` go to the nth visible row from the top or bottom, stopping
+at the other end; `M` takes no count and picks the upper one of two middle
+rows, as Vim does. They are linewise (`dL` deletes through the bottom visible
+line) and end Visual block `$`. They use the rows Pi's next render shows,
+even if the prompt changed or the cursor moved since the last one. When an
+editor rearranges Pi's rows on screen (some framing extensions), `H`, `M`,
+and `L` do nothing; `gj` and the other row motions keep working.
 
 A sentence ends at `.`, `!`, or `?`, followed by any number of `)`, `]`,
 `"`, or `'`, and then a space, a tab, or the line end. Empty lines are
@@ -434,7 +453,11 @@ Deliberate, to keep the scope small:
   number of characters, and browsing Pi's prompt history during INSERT
   repeats as typing that text.
 - **`j` / `k`** keep the display column of the line you leave, without Vim's
-  sticky column.
+  sticky column; `gj` / `gk` do the same within screen rows.
+- **`H` / `M` / `L`** target screen rows, not lines: Pi can show the tail of
+  a wrapped line at the top, and `H` then lands on that row instead of the
+  line's start, and `{n}H` counts rows. They ignore `'scrolloff'`.
+- **`{n}g0` / `{n}g^`** take no count.
 - **Word, quote, and bracket objects** stay on the current line; sentence
   and paragraph objects can span lines. Bracket objects need the cursor inside
   the brackets, and `a"` doesn't take the surrounding whitespace.

@@ -5,6 +5,7 @@
 
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { type Buffer, type Pos, splice } from "./engine.js";
+import type { Row, View } from "./screen.js";
 
 export type Port = {
   read(): Buffer;
@@ -34,6 +35,13 @@ export type Port = {
    * Visual selection. Undefined if the editor's layout internals don't match.
    */
   layout?(width: number): Layout;
+  /** All wrapped rows, as Pi's own up and down keys see them. */
+  rows?(): Row[];
+  /**
+   * The rows Pi's next render shows. Scrolls Pi's view to the cursor first,
+   * as that render would.
+   */
+  view?(): View;
 };
 
 export type Layout = {
@@ -63,6 +71,7 @@ type Internals = {
   lastWidth?: number;
   scrollOffset?: number;
   renderedVisibleLineCount?: number;
+  tui?: { terminal?: { rows?: number } };
 };
 
 const METHODS = [
@@ -111,6 +120,46 @@ export function portFor(editor: object): Port | undefined {
               length: s.length,
             }));
           return { padding, rows };
+        }
+      : undefined;
+  // Pi wraps rows at `lastWidth`, its layout width from the last render, and
+  // moves its own cursor up and down by the same map.
+  const rows =
+    typeof e.buildVisualLineMap === "function" &&
+    typeof e.lastWidth === "number"
+      ? (): Row[] =>
+          (e.buildVisualLineMap?.(e.lastWidth ?? 80) ?? []).map((s) => ({
+            line: s.logicalLine,
+            start: s.startCol,
+            length: s.length,
+          }))
+      : undefined;
+  const view =
+    rows &&
+    typeof e.scrollOffset === "number" &&
+    typeof e.renderedVisibleLineCount === "number"
+      ? (): View => {
+          const all = rows();
+          const { cursorLine, cursorCol } = e.state;
+          let cursor = 0;
+          all.forEach((row, i) => {
+            if (row.line === cursorLine && row.start <= cursorCol) cursor = i;
+          });
+          // Same capacity and scrolling as Editor.render(). The text or the
+          // cursor may have changed since it last ran.
+          const terminal = e.tui?.terminal?.rows;
+          const capacity =
+            typeof terminal === "number"
+              ? Math.max(5, Math.floor(terminal * 0.3))
+              : Math.max(1, e.renderedVisibleLineCount ?? 1);
+          let top = e.scrollOffset ?? 0;
+          if (cursor < top) top = cursor;
+          else if (cursor >= top + capacity) top = cursor - capacity + 1;
+          top = Math.max(0, Math.min(top, all.length - capacity));
+          // Keep it, so the next render shows what the motion saw, even if
+          // several motions run before it.
+          e.scrollOffset = top;
+          return { top, height: Math.min(capacity, all.length - top) };
         }
       : undefined;
   // Pi's editor has no redo: keep the state each undo replaced.
@@ -195,6 +244,8 @@ export function portFor(editor: object): Port | undefined {
       if ("jumpMode" in e) e.jumpMode = null;
     },
     layout,
+    rows,
+    view,
   };
 }
 
