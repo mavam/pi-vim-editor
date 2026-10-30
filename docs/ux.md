@@ -99,13 +99,19 @@ Paste markers (`[paste #1 +24 lines]`) count as one character.
 
 Screen rows are the rows Pi wraps the prompt into at its current width, as
 the arrow keys use them. `gj` and `gk` are exclusive and characterwise, so
-`dgj` deletes up to the same column one row down; `g$` is inclusive. A
-wrapped paste marker's inner rows are skipped. `{n}H` and `{n}L` go to the
-nth visible row from the top or bottom, stopping at the other end; `M` takes
-no count and picks the upper one of two middle rows, as Vim does. `H`, `M`,
-and `L` are linewise (`dL` deletes through the bottom visible line). When
-the top row continues a wrapped line, `H` lands on that row, not the line's
-start. Editors without Pi's layout treat each line as one row, all visible.
+`dgj` deletes up to the same column one row down; `g$` is inclusive. A count
+past the first or last row moves as far as it can, but an operator then does
+nothing (`d9gj`); `{n}g$` still reaches the last row's end. A wrapped paste
+marker's inner rows are skipped. On a row of only blanks, `g^` goes to its
+last blank, as `H`, `M`, and `L` do.
+
+`{n}H` and `{n}L` go to the nth visible row from the top or bottom, stopping
+at the other end; `M` takes no count and picks the upper one of two middle
+rows, as Vim does. They are linewise (`dL` deletes through the bottom visible
+line) and end Visual block `$`. They use the rows Pi's next render shows,
+even if the prompt changed or the cursor moved since the last one. When an
+editor rearranges Pi's rows on screen (some framing extensions), `H`, `M`,
+and `L` do nothing; `gj` and the other row motions keep working.
 
 A sentence ends at `.`, `!`, or `?`, followed by any number of `)`, `]`,
 `"`, or `'`, and then a space, a tab, or the line end. Empty lines are
@@ -448,7 +454,10 @@ Deliberate, to keep the scope small:
   repeats as typing that text.
 - **`j` / `k`** keep the display column of the line you leave, without Vim's
   sticky column; `gj` / `gk` do the same within screen rows.
-- **`H` / `L`** ignore `'scrolloff'`, and `{n}g0` / `{n}g^` take no count.
+- **`H` / `M` / `L`** target screen rows, not lines: Pi can show the tail of
+  a wrapped line at the top, and `H` then lands on that row instead of the
+  line's start, and `{n}H` counts rows. They ignore `'scrolloff'`.
+- **`{n}g0` / `{n}g^`** take no count.
 - **Word, quote, and bracket objects** stay on the current line; sentence
   and paragraph objects can span lines. Bracket objects need the cursor inside
   the brackets, and `a"` doesn't take the surrounding whitespace.

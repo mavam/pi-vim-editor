@@ -8,41 +8,49 @@ import { clusters, type Span, width } from "./text.js";
 
 /** One wrapped display row: `length` UTF-16 units of `line` from `start`. */
 export type Row = { line: number; start: number; length: number };
-/** All wrapped rows, and the `height` rows Pi shows from row `top`. */
-export type Screen = { rows: readonly Row[]; top: number; height: number };
+/** The `height` rows the editor shows from row `top`. */
+export type View = { top: number; height: number };
 
+/** A cluster starting in a row, at display column `v` of that row. */
+type Cell = { span: Span; v: number; w: number };
 /** A row with the clusters that start in it; only these hold a cursor. */
-type Stop = { index: number; line: number; spans: Span[] };
+type Stop = { index: number; line: number; cells: Cell[] };
 
-/** Without a layout, each line is one row and every row is visible. */
-function screenOf(buf: Buffer): Screen {
-  const screen = buf.screen?.();
-  if (screen?.rows.length) return screen;
-  const rows = buf.lines.map((l, line) => ({
-    line,
-    start: 0,
-    length: l.length,
-  }));
-  return { rows, top: 0, height: rows.length };
-}
+const NO_PASTES: ReadonlySet<number> = new Set();
 
 /**
  * Rows that can hold the cursor. A row inside a wrapped paste marker has no
- * cluster start and is skipped; an empty line is one stop at column 0.
+ * cluster start and is skipped; an empty line is one stop at column 0. Cells
+ * count display columns from the row's start, including the visible tail of
+ * a marker that started on the row before.
  */
 function stopsOf(buf: Buffer, rows: readonly Row[]): Stop[] {
+  const measure = buf.measure ?? width;
+  const size = (text: string) =>
+    clusters(text, NO_PASTES).reduce(
+      (sum, s) => sum + measure(text.slice(s.start, s.end)),
+      0,
+    );
   const stops: Stop[] = [];
   const cache = new Map<number, Span[]>();
   rows.forEach((row, index) => {
+    const line = buf.lines[row.line] ?? "";
     let all = cache.get(row.line);
     if (!all) {
-      all = clusters(buf.lines[row.line] ?? "", buf.pastes);
+      all = clusters(line, buf.pastes);
       cache.set(row.line, all);
     }
     const end = row.start + row.length;
     const spans = all.filter((s) => s.start >= row.start && s.start < end);
-    if (spans.length || !all.length)
-      stops.push({ index, line: row.line, spans });
+    if (!spans.length && all.length) return;
+    let v = spans.length ? size(line.slice(row.start, spans[0].start)) : 0;
+    const cells = spans.map((span) => {
+      const w = measure(line.slice(span.start, span.end));
+      const cell = { span, v, w };
+      v += w;
+      return cell;
+    });
+    stops.push({ index, line: row.line, cells });
   });
   return stops;
 }
@@ -52,106 +60,83 @@ function stopAt(stops: Stop[], pos: Pos): number {
   let found = -1;
   stops.forEach((stop, i) => {
     if (stop.line !== pos.line) return;
-    if (found === -1 || (stop.spans[0]?.start ?? 0) <= pos.col) found = i;
+    if (found === -1 || (stop.cells[0]?.span.start ?? 0) <= pos.col) found = i;
   });
   return Math.max(0, found);
 }
 
-const posOf = (stop: Stop, span?: Span): Pos => ({
+const posOf = (stop: Stop, cell?: Cell): Pos => ({
   line: stop.line,
-  col: span?.start ?? 0,
+  col: cell?.span.start ?? 0,
 });
 
-function measureOf(buf: Buffer) {
-  const measure = buf.measure ?? width;
-  const line = (stop: Stop) => buf.lines[stop.line] ?? "";
-  return (stop: Stop, span: Span) =>
-    measure(line(stop).slice(span.start, span.end));
-}
-
-/** First non-blank cluster of a stop, else its first. */
+/** First non-blank cluster of a stop; on a blank row, its last, as in Vim. */
 function firstNonBlank(buf: Buffer, stop: Stop): Pos {
   const line = buf.lines[stop.line] ?? "";
-  const span = stop.spans.find(
-    (s) => !/^\s+$/.test(line.slice(s.start, s.end)),
+  const cell = stop.cells.find(
+    ({ span }) => !/^\s+$/.test(line.slice(span.start, span.end)),
   );
-  return posOf(stop, span ?? stop.spans[0]);
+  return posOf(stop, cell ?? stop.cells.at(-1));
 }
 
 /**
- * Where a screen motion goes from the cursor, or undefined if it can't move:
- * `gj`/`gk` past the last/first row. `{n}H` and `{n}L` count rows from the
- * top and bottom of the visible rows, clamped to them.
+ * Where a screen motion goes from the cursor, or undefined if it can't move.
+ * `complete` is false when a count runs past the first or last row: the
+ * cursor still moves as far as it can, but an operator does nothing, as in
+ * Vim. `H`, `M`, and `L` need the editor's view and count from its edges.
  */
 export function screenMotion(
   buf: Buffer,
   key: string,
   count: number,
-): Pos | undefined {
-  const screen = screenOf(buf);
-  const stops = stopsOf(buf, screen.rows);
+): { to: Pos; complete: boolean } | undefined {
+  const rows =
+    buf.rows?.() ??
+    buf.lines.map((l, line) => ({ line, start: 0, length: l.length }));
+  const stops = stopsOf(buf, rows);
   if (!stops.length) return undefined;
   const at = stopAt(stops, buf.cursor);
   const here = stops[at];
-  const size = measureOf(buf);
   switch (key) {
     case "gj":
     case "gk": {
-      const target = Math.max(
-        0,
-        Math.min(stops.length - 1, at + (key === "gj" ? count : -count)),
-      );
+      const wanted = at + (key === "gj" ? count : -count);
+      const target = Math.max(0, Math.min(stops.length - 1, wanted));
       if (target === at) return undefined;
       // Keep the display column within the row, like `j` and `k` do.
-      let v = 0;
-      for (const span of here.spans) {
-        if (span.start >= buf.cursor.col) break;
-        v += size(here, span);
-      }
+      const v = here.cells.find((c) => c.span.start === buf.cursor.col)?.v ?? 0;
       const to = stops[target];
-      let x = 0;
-      for (const span of to.spans) {
-        const w = size(to, span);
-        if (v < x + w) return posOf(to, span);
-        x += w;
-      }
-      return posOf(to, to.spans.at(-1));
+      const cell = to.cells.find((c) => v < c.v + c.w) ?? to.cells.at(-1);
+      return { to: posOf(to, cell), complete: target === wanted };
     }
     case "g0":
-      return posOf(here, here.spans[0]);
+      return { to: posOf(here, here.cells[0]), complete: true };
     case "g^":
-      return firstNonBlank(buf, here);
+      return { to: firstNonBlank(buf, here), complete: true };
     case "g$": {
-      const to = stops[at + count - 1];
-      return to && posOf(to, to.spans.at(-1));
+      // Vim still moves to the last row's end when the count runs past it.
+      const to = stops[Math.min(stops.length - 1, at + count - 1)];
+      return { to: posOf(to, to.cells.at(-1)), complete: true };
     }
     case "H":
     case "M":
     case "L": {
-      const visible = visibleStops(screen, stops, stops[at].index);
+      const view = buf.view?.();
+      if (!view) return undefined;
+      const visible = stops.filter(
+        (s) => s.index >= view.top && s.index < view.top + view.height,
+      );
+      if (!visible.length) return undefined;
       const n = Math.min(count, visible.length) - 1;
       const i =
         key === "H"
           ? n
           : key === "L"
             ? visible.length - 1 - n
-            : // Vim's middle: the second of two, the third of five.
+            : // Vim's middle: the first of two, the third of five.
               Math.floor((visible.length + 1) / 2) - 1;
-      return firstNonBlank(buf, visible[i]);
+      return { to: firstNonBlank(buf, visible[i]), complete: true };
     }
   }
   return undefined;
-}
-
-/**
- * The stops Pi shows. Pi scrolls on render to keep the cursor's row visible;
- * a move since the last render may not have scrolled yet, so do it here.
- */
-function visibleStops(screen: Screen, stops: Stop[], cursor: number): Stop[] {
-  const height = Math.max(1, Math.min(screen.height, screen.rows.length));
-  let top = Math.min(Math.max(0, screen.top), screen.rows.length - height);
-  if (cursor < top) top = cursor;
-  else if (cursor >= top + height) top = cursor - height + 1;
-  // Never empty: the cursor's own stop is visible.
-  return stops.filter((s) => s.index >= top && s.index < top + height);
 }

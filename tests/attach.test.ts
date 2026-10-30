@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { stripVTControlCharacters } from "node:util";
 import { CustomEditor } from "@earendil-works/pi-coding-agent";
 import { attach, type Shared } from "../src/attach.ts";
 import { portFor } from "../src/port.ts";
@@ -930,24 +931,61 @@ test("keeps one status per editor, back in INSERT after a submit", () => {
   expect(status(editor)?.mode).toBe("insert");
 });
 
-test("moves by Pi's wrapped rows and visible rows", () => {
+const tenLines = Array.from({ length: 10 }, (_, i) => `l${i}`).join("\n");
+
+test("moves by the rows Pi wraps the prompt into", () => {
   const { editor, type } = setup();
-  editor.setText("one two three four five six seven eight nine ten");
+  const text = "one two three four five six seven eight nine ten";
+  editor.setText(text);
   editor.render(20);
   type("\x1b", "0", "g", "j");
-  const { line, col } = editor.getCursor();
-  expect(line).toBe(0);
-  expect(col).toBeGreaterThan(0);
-  type("g", "k");
+  expect(editor.getCursor()).toEqual({ line: 0, col: text.indexOf("five") });
+  type("g", "$");
+  expect(editor.getCursor()).toEqual({
+    line: 0,
+    col: text.indexOf("eight") - 1,
+  });
+  type("g", "k", "g", "0");
   expect(editor.getCursor()).toEqual({ line: 0, col: 0 });
+});
 
-  // A 24-row terminal shows seven rows; the cursor is on the last line.
-  editor.setText(Array.from({ length: 10 }, (_, i) => `l${i}`).join("\n"));
+// A 24-row terminal shows seven rows.
+test("H, M, and L see what Pi's next render shows", () => {
+  const { editor, type } = setup();
   editor.render(40);
+  // The text grew since the last render, which showed one row.
+  editor.setText(tenLines);
   type("\x1b", "H");
   expect(editor.getCursor()).toEqual({ line: 3, col: 0 });
-  type("M");
-  expect(editor.getCursor()).toEqual({ line: 6, col: 0 });
   type("L");
   expect(editor.getCursor()).toEqual({ line: 9, col: 0 });
+  type("g", "g");
+  editor.render(40);
+  // Several motions before a render agree on the scrolled view.
+  type("G", "H", "M");
+  expect(editor.getCursor()).toEqual({ line: 6, col: 0 });
+  expect(
+    editor
+      .render(40)
+      .slice(1, -1)
+      .map((row) => stripVTControlCharacters(row).trim()),
+  ).toEqual(["l3", "l4", "l5", "l6", "l7", "l8", "l9"]);
+});
+
+// Shows only the last three of Pi's rows, between its borders.
+class Clipped extends CustomEditor {
+  override render(width: number) {
+    const rows = super.render(width);
+    return [rows[0], ...rows.slice(-4, -1), rows[rows.length - 1]];
+  }
+}
+
+test("H does nothing when an editor rearranges Pi's rows", () => {
+  const { editor, type } = setup("bottom-right", Clipped);
+  editor.setText(tenLines);
+  editor.render(40);
+  type("\x1b", "H");
+  expect(editor.getCursor()).toEqual({ line: 9, col: 1 });
+  type("g", "k");
+  expect(editor.getCursor()).toEqual({ line: 8, col: 1 });
 });

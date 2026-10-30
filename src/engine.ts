@@ -5,7 +5,7 @@
 
 import { paragraphMotion, paragraphObject } from "./paragraph.js";
 import { reflow } from "./reflow.js";
-import { type Screen, screenMotion } from "./screen.js";
+import { type Row, screenMotion, type View } from "./screen.js";
 import { sentence, sentenceObject } from "./sentence.js";
 import {
   blank,
@@ -28,11 +28,10 @@ export type Buffer = {
   measure?: (cluster: string) => number;
   /** Manual prose wrapping width in terminal columns (default 79). */
   textWidth?: number;
-  /**
-   * The host's wrapped rows, for `gj`, `H`, and the like. Without it, each
-   * line is one row and every row is visible.
-   */
-  screen?: () => Screen;
+  /** The host's wrapped rows, for `gj` and the like; else one per line. */
+  rows?: () => readonly Row[];
+  /** The rows the host shows, for `H`, `M`, and `L`; without it, they fail. */
+  view?: () => View | undefined;
 };
 /** `block` registers come from Visual block mode and put as a block. */
 export type Register = {
@@ -922,8 +921,9 @@ function pressVisual(
     return { state: stay(), effects: [] };
   const found = withFind(parsed, state.find);
   const target = found && resolve(found.command as Motion, buf, false);
-  // Vertical motions keep a block's `$`; others end it.
-  const vertical = /^(j|k|gg|G|gj|gk|H|M|L)$/.test(parsed.key);
+  // Vertical motions keep a block's `$`; others end it. `H`, `M`, and `L`
+  // go to a first non-blank, so they end it, as in Vim.
+  const vertical = /^(j|k|gg|G|gj|gk)$/.test(parsed.key);
   return {
     state: stay({
       find: found?.find ?? state.find,
@@ -2260,13 +2260,14 @@ function resolve(
     case "H":
     case "M":
     case "L": {
-      const to = screenMotion(buf, motion.key, n);
+      const moved = screenMotion(buf, motion.key, n);
+      if (!moved || (operator && !moved.complete)) return undefined;
       const kind: Kind = /^[HML]$/.test(motion.key)
         ? "linewise"
         : motion.key === "g$"
           ? "inclusive"
           : "exclusive";
-      return to && { to, kind };
+      return { to: moved.to, kind };
     }
     case "%": {
       const to = matchBracket(buf);
