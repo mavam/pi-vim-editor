@@ -929,3 +929,25 @@ test("keeps one status per editor, back in INSERT after a submit", () => {
   type("\r");
   expect(status(editor)?.mode).toBe("insert");
 });
+
+test("moves by Pi's wrapped rows and visible rows", () => {
+  const { editor, type } = setup();
+  editor.setText("one two three four five six seven eight nine ten");
+  editor.render(20);
+  type("\x1b", "0", "g", "j");
+  const { line, col } = editor.getCursor();
+  expect(line).toBe(0);
+  expect(col).toBeGreaterThan(0);
+  type("g", "k");
+  expect(editor.getCursor()).toEqual({ line: 0, col: 0 });
+
+  // A 24-row terminal shows seven rows; the cursor is on the last line.
+  editor.setText(Array.from({ length: 10 }, (_, i) => `l${i}`).join("\n"));
+  editor.render(40);
+  type("\x1b", "H");
+  expect(editor.getCursor()).toEqual({ line: 3, col: 0 });
+  type("M");
+  expect(editor.getCursor()).toEqual({ line: 6, col: 0 });
+  type("L");
+  expect(editor.getCursor()).toEqual({ line: 9, col: 0 });
+});

@@ -5,6 +5,7 @@
 
 import { paragraphMotion, paragraphObject } from "./paragraph.js";
 import { reflow } from "./reflow.js";
+import { type Screen, screenMotion } from "./screen.js";
 import { sentence, sentenceObject } from "./sentence.js";
 import {
   blank,
@@ -27,6 +28,11 @@ export type Buffer = {
   measure?: (cluster: string) => number;
   /** Manual prose wrapping width in terminal columns (default 79). */
   textWidth?: number;
+  /**
+   * The host's wrapped rows, for `gj`, `H`, and the like. Without it, each
+   * line is one row and every row is visible.
+   */
+  screen?: () => Screen;
 };
 /** `block` registers come from Visual block mode and put as a block. */
 export type Register = {
@@ -917,7 +923,7 @@ function pressVisual(
   const found = withFind(parsed, state.find);
   const target = found && resolve(found.command as Motion, buf, false);
   // Vertical motions keep a block's `$`; others end it.
-  const vertical = /^(j|k|gg|G)$/.test(parsed.key);
+  const vertical = /^(j|k|gg|G|gj|gk|H|M|L)$/.test(parsed.key);
   return {
     state: stay({
       find: found?.find ?? state.find,
@@ -1428,8 +1434,8 @@ export function apply(buf: Buffer, effects: readonly Effect[]): Buffer {
 // --- Parsing ---------------------------------------------------------------
 
 const MAX_COUNT = 9999;
-const MOTIONS = new Set("hjklwbeWBE0^$G;,%(){}");
-const COUNTED = new Set("hjklwbeWBEG;,fFtTg$(){}");
+const MOTIONS = new Set("hjklwbeWBE0^$G;,%(){}HML");
+const COUNTED = new Set("hjklwbeWBEG;,fFtTg$(){}HL");
 const FINDS = new Set("fFtT");
 const REVERSE: Record<string, string> = { f: "F", F: "f", t: "T", T: "t" };
 const EDITS = new Set([..."iaIAoOxXsSDCYJpPu.~R", CTRL_R]);
@@ -1498,7 +1504,7 @@ function parse(keys: readonly string[]): Command | "pending" | "invalid" {
       if (key !== "g") return { kind: "motion", key, arg, count: n };
       // `{n}gg` goes to line n, like `{n}G`.
       if (arg === "g") return { kind: "motion", key: n ? "G" : "gg", count: n };
-      if (arg === "e" || arg === "E")
+      if (/^[eEjk$]$/.test(arg) || (n === undefined && /^[0^]$/.test(arg)))
         return { kind: "motion", key: `g${arg}`, count: n };
       return "invalid";
     }
@@ -2245,6 +2251,22 @@ function resolve(
     case "}": {
       const to = paragraphMotion(buf, motion.key === "}", n);
       return to && { to, kind: "exclusive" };
+    }
+    case "gj":
+    case "gk":
+    case "g0":
+    case "g^":
+    case "g$":
+    case "H":
+    case "M":
+    case "L": {
+      const to = screenMotion(buf, motion.key, n);
+      const kind: Kind = /^[HML]$/.test(motion.key)
+        ? "linewise"
+        : motion.key === "g$"
+          ? "inclusive"
+          : "exclusive";
+      return to && { to, kind };
     }
     case "%": {
       const to = matchBracket(buf);

@@ -9,15 +9,25 @@ import {
   type Register,
   type State,
 } from "../src/engine.ts";
+import type { Screen } from "../src/screen.ts";
 
-/** Run keys on a buffer written as text with `|` at the cursor. */
-function run(before: string, keys: string, textWidth?: number): string {
+/**
+ * Run keys on a buffer written as text with `|` at the cursor. `screen` lays
+ * the current lines out as rows, for screen motions.
+ */
+function run(
+  before: string,
+  keys: string,
+  textWidth?: number,
+  screen?: (lines: readonly string[]) => Screen,
+): string {
   const raw = before.split("\n");
   const line = raw.findIndex((l) => l.includes("|"));
   let buf: Buffer = {
     textWidth,
     lines: raw.map((l) => l.replace("|", "")),
     cursor: { line, col: raw[line].indexOf("|") },
+    screen: screen && (() => screen(buf.lines)),
   };
   let state: State = { mode: "normal", keys: [] };
   let register: Register | undefined;
@@ -258,6 +268,74 @@ test.each([
   ["|abc\nabc", "<C-v>jly$p", "abc|ab\nabcab"],
   ["|abc\nabc", "<C-v>jc", "|bc\nbc -- insert"],
 ])("%j + %j → %j", (before, keys, after) => {
+  expect(run(before, keys)).toBe(after);
+});
+
+/** Rows of `cols` characters; `height` rows show from row `top`. */
+const wrap =
+  (cols: number, top = 0, height = Infinity) =>
+  (lines: readonly string[]): Screen => {
+    const rows = lines.flatMap((l, line) =>
+      Array.from(
+        { length: Math.max(1, Math.ceil(l.length / cols)) },
+        (_, i) => ({
+          line,
+          start: i * cols,
+          length: Math.min(cols, l.length - i * cols),
+        }),
+      ),
+    );
+    return { rows, top, height: Math.min(height, rows.length) };
+  };
+
+// Screen-row motions on wrapped rows (`wrap(4)`: rows of four characters).
+test.each([
+  ["a|bcdefgh", "gj", 4, "abcde|fgh"],
+  ["abcde|fgh", "gk", 4, "a|bcdefgh"],
+  ["a|bcdefgh\nxy", "2gj", 4, "abcdefgh\nx|y"],
+  ["abc|d\nxy", "gj", 4, "abcd\nx|y"],
+  ["abcd|efgh", "gj", 4, "abcd|efgh"],
+  ["|abcd", "gk", 4, "|abcd"],
+  ["a|bcdefgh", "dgj", 4, "a|fgh"],
+  ["a|bcdefgh", "vgjd", 4, "a|gh"],
+  ["abcdef|gh", "g0", 4, "abcd|efgh"],
+  ["abcd|  ef", "g^", 4, "abcd  |ef"],
+  ["abcd|efgh", "g$", 4, "abcdefg|h"],
+  ["a|bcdefgh", "2g$", 4, "abcdefg|h"],
+  ["a|bcdefgh", "dg$", 4, "a|efgh"],
+  // A wrapped paste marker's inner rows can't hold the cursor.
+  [`|${paste} x`, "gj", 5, `${paste}| x`],
+])("%j + %j at width %j → %j", (before, keys, cols, after) => {
+  expect(run(before, keys, undefined, wrap(cols))).toBe(after);
+});
+
+// `H` `M` `L` on the visible rows (here lines b to d) go to the first
+// non-blank, linewise. A cursor below the view scrolls it, as Pi will.
+const view = "a\n|b\n  c\nd\ne";
+test.each([
+  [view, "H", "a\n|b\n  c\nd\ne"],
+  [view, "M", "a\nb\n  |c\nd\ne"],
+  [view, "L", "a\nb\n  c\n|d\ne"],
+  [view, "2H", "a\nb\n  |c\nd\ne"],
+  [view, "2L", "a\nb\n  |c\nd\ne"],
+  [view, "9H", "a\nb\n  c\n|d\ne"],
+  [view, "dL", "a\n|e"],
+  [view, "VLd", "a\n|e"],
+  ["a\nb\nc\nd\n|e", "H", "a\nb\n|c\nd\ne"],
+])("%j + %j → %j", (before, keys, after) => {
+  expect(run(before, keys, undefined, wrap(80, 1, 3))).toBe(after);
+});
+
+test("H on a wrapped row lands on its first non-blank", () => {
+  expect(run("abcd|  ef", "H", undefined, wrap(4, 1, 1))).toBe("abcd  |ef");
+});
+
+// Without a layout, each line is one row.
+test.each([
+  ["a|b\ncd", "gj", "ab\nc|d"],
+  ["a|bc", "g$", "ab|c"],
+  ["a\n|b\nc", "H", "|a\nb\nc"],
+])("unwrapped: %j + %j → %j", (before, keys, after) => {
   expect(run(before, keys)).toBe(after);
 });
 

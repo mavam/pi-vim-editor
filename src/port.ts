@@ -5,6 +5,7 @@
 
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { type Buffer, type Pos, splice } from "./engine.js";
+import type { Screen } from "./screen.js";
 
 export type Port = {
   read(): Buffer;
@@ -113,6 +114,23 @@ export function portFor(editor: object): Port | undefined {
           return { padding, rows };
         }
       : undefined;
+  // Pi wraps rows at `lastWidth`, its layout width from the last render, and
+  // moves its own cursor up and down by the same map.
+  const screen =
+    typeof e.buildVisualLineMap === "function" &&
+    typeof e.lastWidth === "number" &&
+    typeof e.scrollOffset === "number" &&
+    typeof e.renderedVisibleLineCount === "number"
+      ? (): Screen => ({
+          rows: (e.buildVisualLineMap?.(e.lastWidth ?? 80) ?? []).map((s) => ({
+            line: s.logicalLine,
+            start: s.startCol,
+            length: s.length,
+          })),
+          top: e.scrollOffset ?? 0,
+          height: e.renderedVisibleLineCount ?? 0,
+        })
+      : undefined;
   // Pi's editor has no redo: keep the state each undo replaced.
   type Snapshot = {
     lines: string[];
@@ -137,6 +155,7 @@ export function portFor(editor: object): Port | undefined {
       cursor: { line: e.state.cursorLine, col: e.state.cursorCol },
       pastes: new Set(e.pastes.keys()),
       measure: visibleWidth,
+      screen,
     }),
     setCursor,
     replace(from, to, text, cursor) {

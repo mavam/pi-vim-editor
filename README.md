@@ -70,6 +70,9 @@ After you submit a prompt, the editor is back in INSERT mode.
 | `w` `b` `e` / `W` `B` `E` | Word / WORD start, back, end |
 | `ge` / `gE` | Back to the end of the previous word / WORD |
 | `0` `^` `$` | Line start, first non-blank, last character |
+| `gj` / `gk` | Down / up one screen row through wrapped lines |
+| `g0` `g^` `g$` | Screen row start, first non-blank, last character |
+| `H` / `M` / `L` | Top, middle, bottom visible row |
 | `gg` / `G` / `{n}G` | First line, last line, line n |
 | `f` `F` `t` `T` + char | To / till a character on the line |
 | `;` / `,` | Repeat the last `f F t T` / in reverse |

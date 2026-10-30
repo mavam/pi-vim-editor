@@ -133,6 +133,7 @@ src/
 ├── sentence.ts   # PURE: sentence motions and objects
 ├── paragraph.ts  # PURE: paragraph motions and objects
 ├── reflow.ts     # PURE: manual whole-line prose wrapping and cursor tracking
+├── screen.ts     # PURE: screen-row motions over wrapped rows
 ├── text.ts       # PURE: graphemes, word classes, paste-marker spans
 └── port.ts       # editor capability adapter (§6)
 ```
@@ -214,7 +215,8 @@ cursor. No buffering of split pastes in v0.1.
 
 ```ts
 interface Port {
-  read(): Buffer;                    // getLines(), getCursor() — public
+  read(): Buffer;                    // getLines(), getCursor() — public;
+                                     // wrapped rows, private, optional: §6.1
   autocompleteOpen(): boolean;       // isShowingAutocomplete() — public
   setCursor(pos: Pos): void;         // private: state + setCursorCol()
   replace(from: Pos, to: Pos, text: string, cursor: Pos): void;
@@ -308,7 +310,15 @@ into the selection; the terminal cursor still shows it if Pi uses one. An empty
 line in the selection shows one highlighted cell.
 
 `layout` is optional: if those members are missing, `v` and `V` notify that
-Visual mode isn't supported and everything else keeps working. Upstream ask #4
+Visual mode isn't supported and everything else keeps working.
+
+Screen motions (`gj`, `g$`, `H`, …) read the same private members through
+`Buffer.screen`: `buildVisualLineMap(lastWidth)` for all wrapped rows, the
+map Pi's own arrow keys move through, and `scrollOffset` with
+`renderedVisibleLineCount` for the visible ones. Because they don't map
+rendered rows, they need no border check. A move since the last render may
+not have scrolled yet, so `H` and `L` scroll the visible rows to the cursor
+as Pi's next render will. Without those members, each line is one row. Upstream ask #4
 would replace this with an editor API for highlighting ranges.
 
 ### Upstream asks
