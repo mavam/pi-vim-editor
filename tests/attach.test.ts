@@ -1,5 +1,4 @@
 import { expect, test } from "bun:test";
-import { stripVTControlCharacters } from "node:util";
 import { CustomEditor } from "@earendil-works/pi-coding-agent";
 import { attach, type Shared } from "../src/attach.ts";
 import { portFor } from "../src/port.ts";
@@ -931,6 +930,11 @@ test("keeps one status per editor, back in INSERT after a submit", () => {
   expect(status(editor)?.mode).toBe("insert");
 });
 
+/** A rendered row without styles or Pi's cursor markers (APC sequences). */
+const plain = (row: string) =>
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: escape sequences
+  row.replace(/\x1b\[[0-9;]*m|\x1b_[^\x07]*\x07/g, "");
+
 const tenLines = Array.from({ length: 10 }, (_, i) => `l${i}`).join("\n");
 
 test("moves by the rows Pi wraps the prompt into", () => {
@@ -968,7 +972,7 @@ test("H, M, and L see what Pi's next render shows", () => {
     editor
       .render(40)
       .slice(1, -1)
-      .map((row) => stripVTControlCharacters(row).trim()),
+      .map((row) => plain(row).trim()),
   ).toEqual(["l3", "l4", "l5", "l6", "l7", "l8", "l9"]);
 });
 
