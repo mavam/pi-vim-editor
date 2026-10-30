@@ -1,0 +1,9 @@
+created: 2026-10-30
+title: Screen-row motions
+intro: >-
+  This release adds Vim's screen-row motions, so you can move through long wrapped
+  prompt lines with gj, gk, g0, g^, and g$, and jump to the top, middle, or bottom
+  of a scrolled prompt with H, M, and L.
+source:
+  mode: sync-stable-queue
+  previous_stable: v0.7.0
