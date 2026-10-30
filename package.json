@@ -1,7 +1,7 @@
 {
   "name": "pi-vim-editor",
   "description": "Minimal Vim-style modal editing for Pi's prompt editor that composes with other editor extensions.",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "type": "module",
   "files": [
     "src",

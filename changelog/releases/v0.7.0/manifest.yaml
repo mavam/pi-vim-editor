@@ -1,0 +1,8 @@
+created: 2026-10-30
+title: Require Pi 1.4.0 or newer
+intro: >-
+  pi-vim-editor now requires Pi 1.4.0 or newer. Update Pi before installing or using
+  the extension.
+source:
+  mode: sync-stable-queue
+  previous_stable: v0.6.0
