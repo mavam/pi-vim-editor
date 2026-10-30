@@ -1,6 +1,6 @@
 # pi-vim-editor — architecture design
 
-Status: draft, revised after review · Target host: Pi `main` (≥ 1.1.0) ·
+Status: draft, revised after review · Target host: the latest Pi release (≥ 1.4.0) ·
 License: MIT
 
 ## 1. Goals and non-goals
@@ -364,8 +364,9 @@ in INSERT, 2 (steady block) in NORMAL/Visual, and 4 (steady underline) in
 REPLACE. It checks the public `tui.getShowHardwareCursor()` at render time
 and never changes cursor visibility. It only writes a shape when it changes
 and the focused editor emits `CURSOR_MARKER`. Before Visual highlighting,
-it removes the opening reverse-video SGR immediately after that marker,
-leaving the cell, marker, and style reset intact.
+it removes Pi's fake-cursor opening marker (`ESC _pi:fc BEL`) immediately
+after that marker, leaving the cell, the cursor marker, and the closing marker
+intact.
 
 The cursor controller decorates the editor's public `focused` property,
 composing with existing accessors, to reset on focus loss even when a dialog
