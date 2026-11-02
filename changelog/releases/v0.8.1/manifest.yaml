@@ -1,0 +1,9 @@
+created: 2026-11-02
+title: 'Pi Vim Editor v0.8.1: Keep text visible after the cursor'
+intro: >-
+  This release fixes a display issue that could hide prompt text after the hardware
+  cursor. Text to the right of the cursor now remains visible when Vim cursor shapes
+  are enabled.
+source:
+  mode: sync-stable-queue
+  previous_stable: v0.8.0
