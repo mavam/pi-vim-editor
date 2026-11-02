@@ -3,6 +3,7 @@ import { CustomEditor } from "@earendil-works/pi-coding-agent";
 import {
   Container,
   CURSOR_MARKER,
+  renderFakeCursor,
   TuiAltScreen,
   TuiMainScreen,
   visibleWidth,
@@ -89,14 +90,13 @@ test("uses a bar for INSERT, underline for REPLACE, and block for NORMAL and Vis
   cursor.dispose();
 });
 
-test("removes only Pi's fake cursor, preserving the marker, Unicode, layout, and Visual selection", () => {
+test("keeps Pi's fake cursor whole for Pi to drop, preserving the marker, Unicode, layout, and Visual selection", () => {
   const { editor, type, render, cursor } = setup();
   editor.setText("a👩‍💻界é");
   type("\x1b", "0", "l", "i");
   const lines = render();
-  expect(lines[1]).toContain(`a${CURSOR_MARKER}👩‍💻`);
+  expect(lines[1]).toContain(`a${CURSOR_MARKER}${renderFakeCursor("👩‍💻")}`);
   expect(lines[1]).toContain("界é");
-  expect(lines[1]).not.toMatch(SOFTWARE_CURSOR);
   expect(visibleWidth(lines[1])).toBe(40);
   const visual = type("\x1b", "0", "v", "l");
   expect(visual[1]).toContain("\x1b[7ma");
@@ -269,6 +269,16 @@ test.each([
   const frame = terminal.output.findIndex((text) => text.includes("INSERT"));
   expect(terminal.output.indexOf("\x1b[6 q")).toBeLessThan(frame);
   expect(terminal.output[frame]).not.toContain("\x1b[7m");
+  // The hardware cursor replaces Pi's fake cursor; text after it stays.
+  editor.setText("abcdef");
+  editor.handleInput("\x1b[D");
+  editor.handleInput("\x1b[D");
+  const typed = terminal.output.length;
+  ui.renderNow();
+  const written = terminal.output.slice(typed).join("");
+  expect(written).toContain("abcdef");
+  expect(written).not.toContain("\x1b_pi:");
+  expect(written).not.toContain("\x1b[7m");
   editor.handleInput("\x1b");
   ui.renderNow();
   expect(terminal.output).toContain("\x1b[2 q");
