@@ -272,7 +272,3 @@ sequences. The extension resets the shape with DECSCUSR 0, the terminal's
 default (a blinking block in xterm), when the prompt loses focus, Pi opens an external editor or suspends,
 or the extension shuts down or reloads. It does not query or restore your
 pre-Pi cursor shape.
-
-## 📄 License
-
-[MIT](https://github.com/mavam/pi-vim-editor/blob/main/LICENSE)
