@@ -1,0 +1,9 @@
+created: 2026-11-03
+title: 'Pi Vim Editor v0.9.0: Optional Vim mode label'
+intro: >-
+  You can now hide the Vim mode label with `vimEditor.indicator: "none"`, letting
+  extensions that draw their own editor frame show the mode themselves. Indicator
+  setting changes also apply to editors that are already open.
+source:
+  mode: sync-stable-queue
+  previous_stable: v0.8.1
