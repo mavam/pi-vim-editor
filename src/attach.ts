@@ -62,7 +62,7 @@ export type Shared = {
   textWidth?: number;
   /** Quit Pi. */
   quit(): void;
-  /** Where the mode label goes. */
+  /** Where the mode label goes, or "none" to leave borders unchanged. */
   position: Position;
   /** Color the mode label: muted in INSERT, accent otherwise. */
   paint(insert: boolean, text: string): string;
@@ -72,7 +72,8 @@ export type Position =
   | "bottom-right"
   | "bottom-left"
   | "top-right"
-  | "top-left";
+  | "top-left"
+  | "none";
 
 type Decoratable = {
   handleInput(data: string): void;
@@ -659,8 +660,8 @@ export function attach(
     const text = shared.paint(insert, ` ${label(state)} `);
     return labeled(line, color, text, left);
   };
-  const [vertical, horizontal] = shared.position.split("-");
   target.renderTopBorder = (width: number, hidden: number) => {
+    const [vertical, horizontal] = shared.position.split("-");
     const raw = top(width, hidden);
     const line =
       vertical === "top" ? decorate(raw, horizontal === "left") : raw;
@@ -668,6 +669,7 @@ export function attach(
     return line;
   };
   target.renderBottomBorder = (width: number, hidden: number) => {
+    const [vertical, horizontal] = shared.position.split("-");
     const raw = bottom(width, hidden);
     const line =
       vertical === "bottom" ? decorate(raw, horizontal === "left") : raw;

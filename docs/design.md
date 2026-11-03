@@ -349,7 +349,16 @@ Drafts in [`upstream.md`](upstream.md):
 `INSERT` (muted), `NORMAL` / `VISUAL …` (accent), or the pending keys, such as
 `2d`, `ci`, or `:q`. Theme foreground tokens only, no reverse video. The
 corner comes from `vimEditor.indicator` in Pi's settings (`pi.getSettings()`
-at `session_start`), bottom-right by default.
+at `session_start`), bottom-right by default. Each border callback reads the
+current position, so settings changes apply on the next render even when a
+session reuses the editor.
+
+`none` leaves both border rows unchanged, including scroll and working
+indicators. The callbacks still record the borders for the native-layout
+check, so Visual highlighting and viewport motions keep their behavior.
+Cursor shapes and status publication are independent of the label. Mode,
+pending commands, and search queries then need another extension to display
+them through the status capability (§7.1).
 
 The label needs room at the end of the border line: it must end in plain
 dashes, `borderColor("─…")`. On the right, the label replaces the last dashes.
@@ -368,7 +377,8 @@ Extensions that frame the editor themselves can drop Pi's border rows and
 the label with them. `status.ts` publishes a frozen capability on the
 decorated instance under `Symbol.for("pi-vim-editor")`:
 `{ version: 1, status() }`, where `status()` returns
-`{ mode, pending, label }`. `label` is the same text the border shows.
+`{ mode, pending, label }`. `label` is the text the border would show, even
+when `vimEditor.indicator` is `none`.
 `status()` computes it on every call, after the same reconciliation `render()`
 does, so it never reports a Visual mode that changed text already ended. It
 doesn't depend on the border methods, which keep their behavior. The

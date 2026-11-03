@@ -27,6 +27,7 @@ const POSITIONS: readonly Position[] = [
   "bottom-left",
   "top-right",
   "top-left",
+  "none",
 ];
 
 /** `vimEditor.indicator` from Pi's settings, or the default. */

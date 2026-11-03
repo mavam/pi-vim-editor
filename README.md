@@ -2,8 +2,8 @@
 
 Edit prompts by sentence and paragraph, reshape blocks, and reflow prose—
 without replacing your editor. pi-vim-editor adds Vim-style INSERT and NORMAL
-modes by decorating the installed editor. If another extension customizes the
-editor, load pi-vim-editor after it.
+modes by decorating the installed editor. Editor-extension compatibility
+depends on load order; see [Usage](#-usage).
 
 <table>
   <tr>
@@ -33,11 +33,14 @@ pi install npm:pi-vim-editor
 The prompt starts in INSERT mode. Press `Esc` for NORMAL mode, where the
 common Vim motions, operators, and text objects edit the prompt, and `v`, `V`,
 or `Ctrl-V` start Visual mode. Press `Esc` again in NORMAL mode to interrupt
-the agent, as usual. The current mode shows in a corner of the editor border.
+the agent, as usual. By default, the current mode shows in a corner of the
+editor border.
 
-If another extension also customizes the editor, load pi-vim-editor after
-it. Extensions that draw their own editor frame can show the Vim mode
-themselves; see
+Usually, load pi-vim-editor after extensions that customize the editor. For
+framing extensions, order also affects Visual highlighting and `H`/`M`/`L`:
+these are disabled if the editor pi-vim-editor decorates has already
+rearranged Pi's rows. A framing extension can instead wrap the Vim-decorated
+editor and show the Vim status itself. See
 [docs/integration.md](https://github.com/mavam/pi-vim-editor/blob/main/docs/integration.md).
 
 ## ⌨️ Key bindings
@@ -98,11 +101,12 @@ change the direction of later `n`. Counts work (`2/text`, `3n`). Search wraps
 with a notice. Enter on an empty query reuses the last accepted text in the
 chosen `/` or `?` direction. No match leaves the cursor in place with a notice.
 
-The border shows the query. Backspace deletes its last grapheme; Esc or
-`Ctrl-[` cancels without moving. Enter confirms, **never submits**. Paste adds
-to the query, including line breaks; other shortcuts and navigation keys are
-ignored until you confirm or cancel. External cursor or text changes cancel
-the query. Search memory is private to each editor and resets after submit.
+The border shows the query unless `indicator` is `none`. Backspace deletes
+its last grapheme; Esc or `Ctrl-[` cancels without moving. Enter confirms,
+**never submits**. Paste adds to the query, including line breaks; other
+shortcuts and navigation keys are ignored until you confirm or cancel.
+External cursor or text changes cancel the query. Search memory is private
+to each editor and resets after submit.
 
 Operator search (`d/text`, `cn`, and similar) isn't supported: it cancels
 without editing. Instead, use `v/text`, Enter, then `d`, `c`, or `y` to act on
@@ -250,7 +254,18 @@ Move the mode label to another corner in Pi's `settings.json`:
 { "vimEditor": { "indicator": "top-left" } }
 ```
 
-Choose `bottom-right` (default), `bottom-left`, `top-right`, or `top-left`.
+Choose `bottom-right` (default), `bottom-left`, `top-right`, `top-left`, or
+`none`. To hide the label entirely:
+
+```json
+{ "vimEditor": { "indicator": "none" } }
+```
+
+With `none`, mode text, pending commands, and search queries are visible only
+if another extension renders them from the
+[status capability](https://github.com/mavam/pi-vim-editor/blob/main/docs/integration.md).
+Vim editing, Visual highlighting, and optional cursor shapes remain active.
+Settings are read when a session starts, including for an existing editor.
 
 To also show the mode through the cursor shape, enable both settings:
 

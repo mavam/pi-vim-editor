@@ -1,8 +1,36 @@
 # Integrating with pi-vim-editor
 
 pi-vim-editor shows its mode label in the editor border. If your extension
-draws its own frame around Pi's editor, that label may disappear. Read the
-Vim status from the editor and show it yourself instead.
+draws its own frame around Pi's editor, the label may disappear or interfere
+with border recognition. Read the Vim status from the editor and show it
+yourself instead.
+
+## Draw your own frame
+
+If you render the Vim status in your own frame, tell users to suppress the
+built-in label in Pi's `settings.json`:
+
+```json
+{ "vimEditor": { "indicator": "none" } }
+```
+
+This leaves the underlying editor's border rows unchanged. It does not
+disable Vim editing, Visual highlighting, cursor shapes, or the status
+capability. Without another status display, mode text, pending commands,
+and search queries are hidden. In particular, pi-zentui 0.34.0 does not read
+this capability, so `none` hides that feedback there.
+
+Do not recognize border rows solely by matching pure dashes: Vim labels,
+scroll indicators, and other border widgets can change their text. Validate
+the editor's layout before removing border rows, rather than assuming their
+contents identify them. A compatible framer can already discard labeled
+borders; `none` is useful when you need the borders without Vim's label.
+
+Load order also affects layout. If your factory wraps the Vim-decorated
+editor and delegates its rendering and input, Vim can highlight Pi's rows
+before you rearrange them. If pi-vim-editor instead decorates an editor that
+already rearranges those rows, it skips Visual highlighting and `H`/`M`/`L`.
+See [Visual selections](#visual-selections) for the layout requirements.
 
 ## Read the status
 
@@ -29,7 +57,8 @@ object on every call:
 | `pending` | An unfinished command or search query, such as `2d`, `ci`, `"+`, `:q`, or `/text`; otherwise `""` |
 | `label` | The text of pi-vim-editor's own label: `pending` if it isn't empty, otherwise the mode name, such as `NORMAL` or `VISUAL LINE` |
 
-The label is plain text without styling. pi-vim-editor's own border mutes
+The label is plain text without styling and stays available with
+`vimEditor.indicator: "none"`. pi-vim-editor's own border mutes
 `INSERT` and uses the accent color for everything else. Search queries escape
 control characters, line breaks, and backslashes for safe single-line display;
 `pending` isn't a raw query API.
