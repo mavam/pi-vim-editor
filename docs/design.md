@@ -349,7 +349,9 @@ Drafts in [`upstream.md`](upstream.md):
 `INSERT` (muted), `NORMAL` / `VISUAL …` (accent), or the pending keys, such as
 `2d`, `ci`, or `:q`. Theme foreground tokens only, no reverse video. The
 corner comes from `vimEditor.indicator` in Pi's settings (`pi.getSettings()`
-at `session_start`), bottom-right by default.
+at `session_start`), bottom-right by default. Each border callback reads the
+current position, so settings changes apply on the next render even when a
+session reuses the editor.
 
 The label needs room at the end of the border line: it must end in plain
 dashes, `borderColor("─…")`. On the right, the label replaces the last dashes.

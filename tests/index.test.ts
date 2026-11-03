@@ -87,6 +87,51 @@ test("decorates the editor of a previously installed factory", () => {
   expect(decorated(editor)).toBe(true);
 });
 
+test("rereads the indicator setting for an existing editor at session start", () => {
+  let indicator = "bottom-right";
+  let factory: Factory | undefined;
+  let handler: ((event: unknown, ctx: unknown) => void) | undefined;
+  extension({
+    getSettings: () => ({ vimEditor: { indicator } }),
+    on: (event: string, h: typeof handler) => {
+      if (event === "session_start") handler = h;
+    },
+  } as never);
+  const session = () =>
+    handler?.(
+      {},
+      {
+        mode: "tui",
+        ui: {
+          notify() {},
+          theme: { fg: (_color: string, text: string) => text },
+          getEditorComponent: () => factory,
+          setEditorComponent: (value: Factory) => {
+            factory = value;
+          },
+        },
+      },
+    );
+  session();
+  const installed = factory as Factory;
+  const editor = create(installed);
+  const raw = "─".repeat(40);
+  const left = `─ INSERT ${"─".repeat(31)}`;
+  const right = `${"─".repeat(31)} INSERT ─`;
+  for (const [position, top, bottom] of [
+    ["bottom-right", raw, right],
+    ["top-left", left, raw],
+    ["top-right", right, raw],
+    ["bottom-left", raw, left],
+  ]) {
+    indicator = position;
+    session();
+    expect(factory).toBe(installed);
+    const lines = editor.render(40);
+    expect([lines[0], lines.at(-1)]).toEqual([top, bottom]);
+  }
+});
+
 test("publishes a fresh status for each new editor", () => {
   const factory = start("tui") as Factory;
   const status = (editor: object) =>

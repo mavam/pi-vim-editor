@@ -659,8 +659,8 @@ export function attach(
     const text = shared.paint(insert, ` ${label(state)} `);
     return labeled(line, color, text, left);
   };
-  const [vertical, horizontal] = shared.position.split("-");
   target.renderTopBorder = (width: number, hidden: number) => {
+    const [vertical, horizontal] = shared.position.split("-");
     const raw = top(width, hidden);
     const line =
       vertical === "top" ? decorate(raw, horizontal === "left") : raw;
@@ -668,6 +668,7 @@ export function attach(
     return line;
   };
   target.renderBottomBorder = (width: number, hidden: number) => {
+    const [vertical, horizontal] = shared.position.split("-");
     const raw = bottom(width, hidden);
     const line =
       vertical === "bottom" ? decorate(raw, horizontal === "left") : raw;
