@@ -3,6 +3,8 @@ title: Indicator setting changes for existing editors
 type: bugfix
 authors:
   - mavam
+prs:
+  - 15
 created: 2026-11-03T20:36:48.498096Z
 ---
 

@@ -343,14 +343,19 @@ test("a failed Visual paragraph extension preserves the selection", () => {
   expect(shared.register).toEqual({ text: "B\nb", linewise: true });
 });
 
-test("highlights the Visual selection", () => {
-  const { editor, type } = setup();
-  type(..."foo bar", "\x1b", "0", "v", "e");
-  const lines = editor.render(40);
-  expect(lines[1]).toStartWith("\x1b[7mfo");
-  expect(lines[1]).toContain("\x1b[27m bar");
-  expect(lines.some((line) => line.includes("<VISUAL>"))).toBe(true);
-});
+test.each(["bottom-right", "none"] as const)(
+  "highlights the Visual selection with indicator %s",
+  (position) => {
+    const { editor, type } = setup(position);
+    type(..."foo bar", "\x1b", "0", "v", "e");
+    const lines = editor.render(40);
+    expect(lines[1]).toStartWith("\x1b[7mfo");
+    expect(lines[1]).toContain("\x1b[27m bar");
+    expect(lines.some((line) => line.includes("<VISUAL>"))).toBe(
+      position !== "none",
+    );
+  },
+);
 
 test("inserts and appends on every line of a block", () => {
   const { editor, type } = setup();
@@ -374,6 +379,30 @@ test("quits with :q only when the prompt is empty, or with :q!", () => {
 test("puts the mode label where the setting says", () => {
   const { editor } = setup("top-left");
   expect(editor.render(40)[0]).toStartWith("─<INSERT>─");
+});
+
+test("leaves Pi's borders unchanged with the indicator disabled", () => {
+  const { editor } = setup("none");
+  const raw = new CustomEditor(
+    tui as never,
+    theme as never,
+    createKeybindings(),
+  );
+  const borders = (editor: CustomEditor) => {
+    const lines = editor.render(40);
+    return [lines[0], lines.at(-1)];
+  };
+  for (const text of ["foo bar", tenLines]) {
+    editor.setText(text);
+    raw.setText(text);
+    expect(borders(editor)).toEqual(borders(raw));
+    // Keep both scroll indicators intact, not just the plain borders.
+    for (let i = 0; i < 10; i++) {
+      editor.handleInput("\x1b[A");
+      raw.handleInput("\x1b[A");
+    }
+    expect(borders(editor)).toEqual(borders(raw));
+  }
 });
 
 test("ends Visual mode when something else changes the text", () => {
@@ -619,27 +648,34 @@ test.each([
   expect(editor.getText()).toBe("first\nsecond");
 });
 
-test("publishes the current mode and pending keys", () => {
-  const { editor, type } = setup();
-  editor.setText("foo bar");
-  const steps: [string[], string, string, string][] = [
-    [[], "insert", "", "INSERT"],
-    [["\x1b"], "normal", "", "NORMAL"],
-    [["2", "d"], "normal", "2d", "2d"],
-    [["\x1b", '"', "+"], "normal", '"+', '"+'],
-    [["\x1b", "v"], "visual", "", "VISUAL"],
-    [["V"], "visual-line", "", "VISUAL LINE"],
-    [["\x16"], "visual-block", "", "VISUAL BLOCK"],
-    [["\x1b", "R"], "replace", "", "REPLACE"],
-    [["\x1b", ":", "q"], "normal", ":q", ":q"],
-  ];
-  for (const [keys, mode, pending, label] of steps) {
-    type(...keys);
-    // Current without a render in between, and the same as the border.
-    expect(status(editor)).toEqual({ mode, pending, label } as never);
-    expect(editor.render(40).at(-1)).toContain(`<${label}>`);
-  }
-});
+test.each(["bottom-right", "none"] as const)(
+  "publishes the current mode and pending keys with indicator %s",
+  (position) => {
+    const { editor, type } = setup(position);
+    editor.setText("foo bar");
+    const steps: [string[], string, string, string][] = [
+      [[], "insert", "", "INSERT"],
+      [["\x1b"], "normal", "", "NORMAL"],
+      [["2", "d"], "normal", "2d", "2d"],
+      [["\x1b", '"', "+"], "normal", '"+', '"+'],
+      [["\x1b", "v"], "visual", "", "VISUAL"],
+      [["V"], "visual-line", "", "VISUAL LINE"],
+      [["\x16"], "visual-block", "", "VISUAL BLOCK"],
+      [["\x1b", "R"], "replace", "", "REPLACE"],
+      [["\x1b", ":", "q"], "normal", ":q", ":q"],
+      [["\x1b", "/", "f", "o", "o"], "normal", "/foo", "/foo"],
+    ];
+    for (const [keys, mode, pending, label] of steps) {
+      type(...keys);
+      // Current without a render in between, even with no border label.
+      expect(status(editor)).toEqual({ mode, pending, label } as never);
+      const lines = editor.render(40);
+      if (position === "none")
+        expect([lines[0], lines.at(-1)]).toEqual(Array(2).fill("─".repeat(40)));
+      else expect(lines.at(-1)).toContain(`<${label}>`);
+    }
+  },
+);
 
 test("gwap tracks the cursor's text, preserves the register, and repeats with one-step undo", () => {
   const { editor, shared, copies, type } = setup();

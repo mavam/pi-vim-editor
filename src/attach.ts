@@ -62,7 +62,7 @@ export type Shared = {
   textWidth?: number;
   /** Quit Pi. */
   quit(): void;
-  /** Where the mode label goes. */
+  /** Where the mode label goes, or "none" to leave borders unchanged. */
   position: Position;
   /** Color the mode label: muted in INSERT, accent otherwise. */
   paint(insert: boolean, text: string): string;
@@ -72,7 +72,8 @@ export type Position =
   | "bottom-right"
   | "bottom-left"
   | "top-right"
-  | "top-left";
+  | "top-left"
+  | "none";
 
 type Decoratable = {
   handleInput(data: string): void;

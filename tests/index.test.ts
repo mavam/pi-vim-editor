@@ -87,6 +87,15 @@ test("decorates the editor of a previously installed factory", () => {
   expect(decorated(editor)).toBe(true);
 });
 
+test("accepts none to hide the indicator without disabling Vim", () => {
+  const editor = create(
+    start("tui", undefined, { vimEditor: { indicator: "none" } }) as Factory,
+  );
+  const lines = editor.render(40);
+  expect([lines[0], lines.at(-1)]).toEqual(Array(2).fill("─".repeat(40)));
+  expect(decorated(editor)).toBe(true);
+});
+
 test("rereads the indicator setting for an existing editor at session start", () => {
   let indicator = "bottom-right";
   let factory: Factory | undefined;
@@ -120,8 +129,10 @@ test("rereads the indicator setting for an existing editor at session start", ()
   const right = `${"─".repeat(31)} INSERT ─`;
   for (const [position, top, bottom] of [
     ["bottom-right", raw, right],
+    ["none", raw, raw],
     ["top-left", left, raw],
     ["top-right", right, raw],
+    ["none", raw, raw],
     ["bottom-left", raw, left],
   ]) {
     indicator = position;

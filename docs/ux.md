@@ -514,8 +514,13 @@ To place the mode label:
 ```
 
 `indicator` places the mode label: `bottom-right` (default), `bottom-left`,
-`top-right`, or `top-left`. On the top border, the label sits next to Pi's
-working indicator; when a border has no room, the label is left out.
+`top-right`, `top-left`, or `none`. On the top border, the label sits next to
+Pi's working indicator; when a border has no room, the label is left out.
+With `none`, the border rows are unchanged and no mode, pending command, or
+search query is shown there. Other extensions can still display the
+[status capability](integration.md). Editing, Visual highlighting, and
+cursor shapes keep working. Each render uses the latest position read at
+session start, even when the editor is reused.
 
 Set `"vimEditor": { "cursorShape": true }` and `"showHardwareCursor": true`
 to use steady cursor shapes: bar in INSERT, block in NORMAL and all Visual
