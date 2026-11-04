@@ -1,0 +1,8 @@
+created: 2026-11-04
+title: Per-mode cursor styles
+intro: >-
+  You can now choose the cursor style for each Vim mode, such as a blinking bar in
+  INSERT mode, by setting `vimEditor.cursorShape` to a map of named styles.
+source:
+  mode: sync-stable-queue
+  previous_stable: v0.9.0
