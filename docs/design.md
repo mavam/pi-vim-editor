@@ -390,7 +390,13 @@ Pi's reverse-video block, with no terminal escapes from this extension.
 
 With `vimEditor.cursorShape: true`, `cursor.ts` uses DECSCUSR 6 (steady bar)
 in INSERT, 2 (steady block) in NORMAL/Visual, and 4 (steady underline) in
-REPLACE. It checks the public `tui.getShowHardwareCursor()` at render time
+REPLACE. A map instead of `true` overrides these defaults per mode with named
+styles (`blinking-bar`, …, `reset` for DECSCUSR 0). One setting, not a second
+key, keeps precedence trivial: Pi's settings merge objects but replace
+scalars, so a project's `false` disables a global map. The pure
+`cursorShapes()` parser resolves the setting into a complete table over all
+six internal modes (`visual` covers `vline` and `vblock`) or `undefined`
+(off), and the controller only looks up `shapes[mode]`. It checks the public `tui.getShowHardwareCursor()` at render time
 and never changes cursor visibility. It only writes a shape when it changes
 and the focused editor emits `CURSOR_MARKER`. It leaves Pi's fake-cursor
 markers (`ESC _pi:fc BEL` … `ESC _pi:/fc BEL`) alone and lets Pi resolve them:

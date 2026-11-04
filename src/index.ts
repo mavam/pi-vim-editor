@@ -8,7 +8,12 @@ import { getNativeClipboard } from "@earendil-works/pi-tui";
 import { attach, type Position, type Shared } from "./attach.js";
 
 import { createClipboard, readCommands } from "./clipboard.js";
-import { type Cursor, cursorFor } from "./cursor.js";
+import {
+  type Cursor,
+  type CursorShapes,
+  cursorFor,
+  cursorShapes,
+} from "./cursor.js";
 import { textWidth } from "./reflow.js";
 
 export type {
@@ -44,10 +49,10 @@ function position(settings: unknown): Position {
  * it. See docs/design.md.
  */
 export default function (pi: ExtensionAPI): void {
-  let cursorShape = false;
+  let shapes: CursorShapes | undefined;
   const cursors = new WeakMap<object, Cursor>();
   let disposeCursor = () => {};
-  let configureCursor = (_enabled: boolean) => {};
+  let configureCursor = (_shapes: CursorShapes | undefined) => {};
   const shared: Shared = {
     register: undefined,
     notify: () => {},
@@ -71,10 +76,11 @@ export default function (pi: ExtensionAPI): void {
       (settings as { vimEditor?: { textWidth?: unknown } })?.vimEditor
         ?.textWidth,
     );
-    cursorShape =
+    shapes = cursorShapes(
       (settings as { vimEditor?: { cursorShape?: unknown } })?.vimEditor
-        ?.cursorShape === true;
-    configureCursor(cursorShape);
+        ?.cursorShape,
+    );
+    configureCursor(shapes);
     const clipboard = (settings as { vimEditor?: { clipboard?: unknown } })
       ?.vimEditor?.clipboard;
     shared.unnamed = clipboard === "unnamedplus" || clipboard === "unnamed";
@@ -98,10 +104,10 @@ export default function (pi: ExtensionAPI): void {
         cursors.get(editor)?.dispose();
         cursors.delete(editor);
       };
-      configureCursor = (enabled) => {
+      configureCursor = (next) => {
         disposeCursor();
-        if (!enabled || !attached) return;
-        const cursor = cursorFor(editor, tui);
+        if (!next || !attached) return;
+        const cursor = cursorFor(editor, tui, next);
         if (cursor) cursors.set(editor, cursor);
         else
           shared.notify(
@@ -109,7 +115,7 @@ export default function (pi: ExtensionAPI): void {
             "warning",
           );
       };
-      configureCursor(cursorShape);
+      configureCursor(shapes);
       return editor;
     };
     ui.setEditorComponent(Object.assign(factory, { [OURS]: true }));

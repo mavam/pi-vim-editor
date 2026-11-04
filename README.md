@@ -281,6 +281,28 @@ NORMAL and Visual modes a steady block, and REPLACE a steady underline. Pi
 still controls cursor visibility; with its hardware cursor hidden, the
 software cursor stays unchanged.
 
+To pick the style per mode, set `cursorShape` to a map instead of `true`:
+
+```json
+{
+  "showHardwareCursor": true,
+  "vimEditor": {
+    "cursorShape": {
+      "insert": "blinking-bar",
+      "normal": "blinking-block",
+      "replace": "blinking-underline"
+    }
+  }
+}
+```
+
+The keys are `insert`, `normal`, `visual` (all Visual modes), and `replace`.
+The styles are `steady-bar`, `blinking-bar`, `steady-block`,
+`blinking-block`, `steady-underline`, `blinking-underline`, and `reset` for
+the terminal's default. Missing or invalid entries keep their default style.
+Set `cursorShape` to `false` to turn off a map inherited from your global
+settings.
+
 Cursor shapes require DECSCUSR support in your terminal and, if used, tmux
 or another multiplexer. Disable `cursorShape` if your terminal ignores the
 sequences. The extension resets the shape with DECSCUSR 0, the terminal's

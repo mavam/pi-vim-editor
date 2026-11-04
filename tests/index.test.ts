@@ -231,8 +231,13 @@ test.each([false, true])(
     settings = { vimEditor: { cursorShape: true } };
     session();
     second.render(40);
+    expect(writes.at(-1)).toBe("\x1b[6 q");
+    settings = { vimEditor: { cursorShape: { insert: "blinking-bar" } } };
+    session();
+    second.render(40);
+    expect(writes.slice(-2)).toEqual(["\x1b[0 q", "\x1b[5 q"]);
     handlers.get("session_shutdown")?.({ reason: "reload" }, {});
-    expect(writes.slice(-2)).toEqual(["\x1b[6 q", "\x1b[0 q"]);
+    expect(writes.slice(-2)).toEqual(["\x1b[5 q", "\x1b[0 q"]);
     const count = writes.length;
     second.render(40);
     first.render(40);

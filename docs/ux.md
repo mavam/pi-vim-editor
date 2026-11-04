@@ -529,6 +529,14 @@ change Pi's hardware-cursor visibility setting. When the hardware cursor is
 hidden, Pi's software cursor stays unchanged. Visual selections remain
 highlighted when the hardware cursor is shown.
 
+`cursorShape` also accepts a map from `insert`, `normal`, `visual`, and
+`replace` to a style: `steady-bar`, `blinking-bar`, `steady-block`,
+`blinking-block`, `steady-underline`, `blinking-underline`, or `reset` (the
+terminal's default). `visual` covers `v`, `V`, and `Ctrl-V`. Entries
+override the steady defaults; missing or invalid entries keep them. Any other
+value, including `false`, disables cursor shapes, so a project can turn off a
+globally configured map.
+
 The terminal and any multiplexer must support DECSCUSR. When the prompt
 loses focus or Pi yields the terminal, the shape resets with DECSCUSR 0
 (the terminal's default; a blinking block in xterm); the previous terminal

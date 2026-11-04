@@ -6,8 +6,60 @@ export type Cursor = {
   dispose(): void;
 };
 
+/** The DECSCUSR parameter for every mode. */
+export type CursorShapes = Readonly<Record<Mode, number>>;
+
+/** DECSCUSR parameters by name; `reset` is the terminal's default. */
+const STYLES: Readonly<Record<string, number>> = {
+  reset: 0,
+  "blinking-block": 1,
+  "steady-block": 2,
+  "blinking-underline": 3,
+  "steady-underline": 4,
+  "blinking-bar": 5,
+  "steady-bar": 6,
+};
+
+/** User-facing keys; `visual` covers all three Visual modes. */
+const KEYS: Readonly<Record<string, readonly Mode[]>> = {
+  insert: ["insert"],
+  normal: ["normal"],
+  visual: ["visual", "vline", "vblock"],
+  replace: ["replace"],
+};
+
+const DEFAULTS: CursorShapes = {
+  insert: 6,
+  normal: 2,
+  visual: 2,
+  vline: 2,
+  vblock: 2,
+  replace: 4,
+};
+
+/**
+ * `vimEditor.cursorShape` from Pi's settings: `true` selects the defaults, a
+ * map overrides them per mode, and anything else disables cursor shapes.
+ */
+export function cursorShapes(value: unknown): CursorShapes | undefined {
+  if (value === true) return DEFAULTS;
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return undefined;
+  const shapes = { ...DEFAULTS };
+  for (const [key, modes] of Object.entries(KEYS)) {
+    const style = (value as Record<string, unknown>)[key];
+    if (typeof style !== "string" || !Object.hasOwn(STYLES, style)) continue;
+    for (const mode of modes) shapes[mode] = STYLES[style];
+  }
+  return shapes;
+}
+
 /** Own the cursor shape only while this editor has a visible hardware cursor. */
-export function cursorFor(editor: object, tui: TUI): Cursor | undefined {
+export function cursorFor(
+  editor: object,
+  tui: TUI,
+  shapes: CursorShapes,
+): Cursor | undefined {
   const target = editor as { focused: boolean };
   const terminal = tui.terminal;
   const focus = Object.getOwnPropertyDescriptor(editor, "focused");
@@ -83,7 +135,7 @@ export function cursorFor(editor: object, tui: TUI): Cursor | undefined {
         reset();
         return;
       }
-      const next = mode === "insert" ? 6 : mode === "replace" ? 4 : 2;
+      const next = shapes[mode];
       if (next !== shape) {
         terminal.write(`\x1b[${next} q`);
         shape = next;
