@@ -9,7 +9,7 @@ import {
   visibleWidth,
 } from "@earendil-works/pi-tui";
 import { attach } from "../src/attach.ts";
-import { cursorFor } from "../src/cursor.ts";
+import { type CursorShapes, cursorFor, cursorShapes } from "../src/cursor.ts";
 import { keybindings, theme, tui } from "./fixtures.ts";
 
 // Pi's software cursor right after the focus marker, an APC.
@@ -17,7 +17,9 @@ const SOFTWARE_CURSOR = new RegExp(
   `${CURSOR_MARKER.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}\x1b_pi:fc\x07`,
 );
 
-function setup() {
+const DEFAULTS = cursorShapes(true) as CursorShapes;
+
+function setup(shapes = DEFAULTS) {
   const writes: string[] = [];
   let hardware = true;
   const host = {
@@ -37,7 +39,7 @@ function setup() {
   const kb = keybindings();
   const editor = new CustomEditor(host as never, theme as never, kb);
   editor.focused = true;
-  const cursor = cursorFor(editor, host as never);
+  const cursor = cursorFor(editor, host as never, shapes);
   if (!cursor) throw new Error("Expected cursor support for CustomEditor");
   attach(
     editor,
@@ -90,6 +92,63 @@ test("uses a bar for INSERT, underline for REPLACE, and block for NORMAL and Vis
   cursor.dispose();
 });
 
+test("applies a per-mode style map to every mode, including all Visual modes", () => {
+  const shapes = cursorShapes({
+    insert: "blinking-bar",
+    normal: "blinking-block",
+    visual: "reset",
+    replace: "blinking-underline",
+  });
+  if (!shapes) throw new Error("Expected a style map");
+  const { editor, type, writes, render, cursor } = setup(shapes);
+  editor.setText("abc\ndef");
+  render();
+  type("\x1b");
+  type("v");
+  type("\x1b", "V");
+  type("\x1b", "\x16");
+  type("\x1b", "R");
+  type("\x1b", "i");
+  // Each type() renders once: V and Ctrl-V keep Visual's shape, so no writes.
+  expect(writes).toEqual([
+    "\x1b[5 q",
+    "\x1b[1 q",
+    "\x1b[0 q",
+    "\x1b[3 q",
+    "\x1b[5 q",
+  ]);
+  cursor.dispose();
+});
+
+test.each([
+  [undefined, undefined],
+  [false, undefined],
+  ["steady-bar", undefined],
+  [1, undefined],
+  [null, undefined],
+  [[], undefined],
+  [true, [6, 2, 2, 2, 2, 4]],
+  [{}, [6, 2, 2, 2, 2, 4]],
+  [{ insert: "blinking-bar" }, [5, 2, 2, 2, 2, 4]],
+  [{ visual: "steady-underline" }, [6, 2, 4, 4, 4, 4]],
+  [{ normal: "reset", replace: "steady-block" }, [6, 0, 2, 2, 2, 2]],
+  [
+    { insert: 5, normal: "bar", replace: "toString", other: "reset" },
+    [6, 2, 2, 2, 2, 4],
+  ],
+] as const)(
+  "reads cursorShape %j as off, the defaults, or overrides",
+  (value, expected) => {
+    const shapes = cursorShapes(value);
+    expect(
+      shapes &&
+        (
+          ["insert", "normal", "visual", "vline", "vblock", "replace"] as const
+        ).map((mode) => shapes[mode]),
+    ).toEqual(expected as never);
+  },
+);
+
 test("keeps Pi's fake cursor whole for Pi to drop, preserving the marker, Unicode, layout, and Visual selection", () => {
   const { editor, type, render, cursor } = setup();
   editor.setText("a👩‍💻界é");
@@ -118,18 +177,26 @@ test("leaves Pi's software cursor intact when the hardware cursor is hidden", ()
   cursor.dispose();
 });
 
-test("restores the terminal default on focus loss, even if the editor isn't rendered", () => {
-  const { editor, writes, render, type, cursor } = setup();
-  type("\x1b", "R");
-  editor.focused = false;
-  expect(writes).toEqual(["\x1b[4 q", "\x1b[0 q"]);
-  render();
-  expect(writes).toHaveLength(2);
-  editor.focused = true;
-  render();
-  expect(writes.at(-1)).toBe("\x1b[4 q");
-  cursor.dispose();
-});
+test.each([
+  ["steady-underline", 4],
+  ["reset", 0],
+] as const)(
+  "restores the terminal default on focus loss, even if the editor isn't rendered (REPLACE: %s)",
+  (replace, code) => {
+    const shapes = cursorShapes({ replace });
+    if (!shapes) throw new Error("Expected a style map");
+    const { editor, writes, render, type, cursor } = setup(shapes);
+    type("\x1b", "R");
+    editor.focused = false;
+    expect(writes).toEqual([`\x1b[${code} q`, "\x1b[0 q"]);
+    render();
+    expect(writes).toHaveLength(2);
+    editor.focused = true;
+    render();
+    expect(writes.at(-1)).toBe(`\x1b[${code} q`);
+    cursor.dispose();
+  },
+);
 
 test("restores before yielding the terminal and reapplies after resume", () => {
   const { host, writes, render, cursor } = setup();
@@ -159,7 +226,7 @@ test("leaves Vim editing available when cursor decoration isn't supported", () =
   const { editor, host, cursor, type, writes } = setup();
   cursor.dispose();
   Object.defineProperty(editor, "focused", { configurable: false });
-  expect(cursorFor(editor, host as never)).toBeUndefined();
+  expect(cursorFor(editor, host as never, DEFAULTS)).toBeUndefined();
   type("abc", "\x1b", "0", "x");
   expect(editor.getText()).toBe("bc");
   expect(writes).toEqual([]);
@@ -180,7 +247,7 @@ test.each(["get", "set"] as const)(
         focused = value;
       },
     });
-    const next = cursorFor(editor, host as never);
+    const next = cursorFor(editor, host as never, DEFAULTS);
     if (!next) throw new Error("Expected cursor support for accessors");
     next.render("insert", render());
     const stop = host.terminal.stop;
@@ -250,7 +317,7 @@ test.each([
   } else ui.addChild(editor);
   ui.setFocus(editor);
   ui.start();
-  const cursor = cursorFor(editor, ui);
+  const cursor = cursorFor(editor, ui, DEFAULTS);
   if (!cursor) throw new Error("Expected cursor support for CustomEditor");
   attach(
     editor,
