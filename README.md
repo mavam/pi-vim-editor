@@ -300,7 +300,9 @@ The keys are `insert`, `normal`, `visual` (all Visual modes), and `replace`.
 The styles are `steady-bar`, `blinking-bar`, `steady-block`,
 `blinking-block`, `steady-underline`, `blinking-underline`, and `reset` for
 the terminal's default. Missing or invalid entries keep their default style.
-Set `cursorShape` to `false` to turn off a map inherited from your global
+Pi merges maps across global and project settings, so a project map only
+overrides the entries it names; `{}` doesn't reset inherited entries. Set
+`cursorShape` to `false` to turn off a map inherited from your global
 settings.
 
 Cursor shapes require DECSCUSR support in your terminal and, if used, tmux

@@ -177,18 +177,26 @@ test("leaves Pi's software cursor intact when the hardware cursor is hidden", ()
   cursor.dispose();
 });
 
-test("restores the terminal default on focus loss, even if the editor isn't rendered", () => {
-  const { editor, writes, render, type, cursor } = setup();
-  type("\x1b", "R");
-  editor.focused = false;
-  expect(writes).toEqual(["\x1b[4 q", "\x1b[0 q"]);
-  render();
-  expect(writes).toHaveLength(2);
-  editor.focused = true;
-  render();
-  expect(writes.at(-1)).toBe("\x1b[4 q");
-  cursor.dispose();
-});
+test.each([
+  ["steady-underline", 4],
+  ["reset", 0],
+] as const)(
+  "restores the terminal default on focus loss, even if the editor isn't rendered (REPLACE: %s)",
+  (replace, code) => {
+    const shapes = cursorShapes({ replace });
+    if (!shapes) throw new Error("Expected a style map");
+    const { editor, writes, render, type, cursor } = setup(shapes);
+    type("\x1b", "R");
+    editor.focused = false;
+    expect(writes).toEqual([`\x1b[${code} q`, "\x1b[0 q"]);
+    render();
+    expect(writes).toHaveLength(2);
+    editor.focused = true;
+    render();
+    expect(writes.at(-1)).toBe(`\x1b[${code} q`);
+    cursor.dispose();
+  },
+);
 
 test("restores before yielding the terminal and reapplies after resume", () => {
   const { host, writes, render, cursor } = setup();

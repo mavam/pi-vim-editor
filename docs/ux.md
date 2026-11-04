@@ -533,7 +533,9 @@ highlighted when the hardware cursor is shown.
 `replace` to a style: `steady-bar`, `blinking-bar`, `steady-block`,
 `blinking-block`, `steady-underline`, `blinking-underline`, or `reset` (the
 terminal's default). `visual` covers `v`, `V`, and `Ctrl-V`. Entries
-override the steady defaults; missing or invalid entries keep them. Any other
+override the steady defaults; missing or invalid entries keep them. Pi
+merges global and project maps first, so a project map overrides only the
+entries it names. Any other
 value, including `false`, disables cursor shapes, so a project can turn off a
 globally configured map.
 
