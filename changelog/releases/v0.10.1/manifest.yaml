@@ -1,0 +1,8 @@
+created: 2026-11-26
+title: Visual mode support for read-only editor output
+intro: "Visual mode now highlights selections without modifying the wrapped editor\u2019\
+  s rendered lines. This keeps highlighting working when Pi or another editor extension\
+  \ freezes or caches its output."
+source:
+  mode: sync-stable-queue
+  previous_stable: v0.10.0
