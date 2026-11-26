@@ -2,7 +2,7 @@ import { CURSOR_MARKER, type TUI } from "@earendil-works/pi-tui";
 import type { Mode } from "./engine.js";
 
 export type Cursor = {
-  render(mode: Mode, lines: string[]): void;
+  render(mode: Mode, lines: readonly string[]): void;
   dispose(): void;
 };
 

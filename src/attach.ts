@@ -77,7 +77,7 @@ export type Position =
 
 type Decoratable = {
   handleInput(data: string): void;
-  render(width: number): string[];
+  render(width: number): readonly string[];
   renderTopBorder(width: number, hidden: number): string;
   renderBottomBorder(width: number, hidden: number): string;
   borderColor?: (text: string) => string;
@@ -92,7 +92,7 @@ export function attach(
   editor: object,
   keybindings: KeybindingsManager,
   shared: Shared,
-  renderCursor?: (mode: Mode, lines: string[]) => void,
+  renderCursor?: (mode: Mode, lines: readonly string[]) => void,
   /** Ask Pi to render, for changes that arrive outside input. */
   redraw: () => void = () => {},
 ): boolean {
@@ -649,8 +649,7 @@ export function attach(
     shown = !!layout && native(lines, width, layout, borders);
     if (!isVisual(state.mode) || !layout || !shown) return lines;
     const buf = port.read();
-    highlight(lines, buf.lines, selectedSpans(state, buf), layout);
-    return lines;
+    return highlight(lines, buf.lines, selectedSpans(state, buf), layout);
   };
 
   const decorate = (line: string, left: boolean) => {
@@ -759,18 +758,19 @@ const RESETS = new Set(["\x1b[0m", "\x1b[m", UNREVERSE, "\x1b_pi:/fc\x07"]);
 // biome-ignore lint/suspicious/noControlCharactersInRegex: terminal escapes
 const ESCAPE = /\x1b(?:\[[0-?]*[ -/]*[@-~]|[_\]P][^\x07\x1b]*(?:\x07|\x1b\\))/y;
 
-/** Reverse-video the selection in the editor rows Pi rendered. */
+/** Reverse-video the selection in a copy of the editor rows Pi rendered. */
 function highlight(
-  rendered: string[],
+  rendered: readonly string[],
   lines: readonly string[],
-  spans: LineSpan[],
+  spans: readonly LineSpan[],
   { padding, rows }: Layout,
-) {
+): string[] {
+  const out = [...rendered];
   rows.forEach((row, i) => {
     const span = spans.find((s) => s.line === row.line);
     const line = lines[row.line];
     // Never style rows or lines that aren't there.
-    if (!span || line === undefined || rendered[i + 1] === undefined) return;
+    if (!span || line === undefined || out[i + 1] === undefined) return;
     const { start, end } = span;
     const a = Math.max(start, row.start);
     const b = Math.min(end, row.start + row.length);
@@ -778,8 +778,9 @@ function highlight(
     let last = first + visibleWidth(line.slice(a, b));
     // An empty line in the selection shows one highlighted cell.
     if (line === "" && span.eol) [first, last] = [padding, padding + 1];
-    if (last > first) rendered[i + 1] = reverse(rendered[i + 1], first, last);
+    if (last > first) out[i + 1] = reverse(out[i + 1], first, last);
   });
+  return out;
 }
 
 /** Reverse video for visible columns `[from, to)` of a rendered row. */

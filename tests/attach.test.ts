@@ -357,6 +357,31 @@ test.each(["bottom-right", "none"] as const)(
   },
 );
 
+test("copies readonly render output before highlighting Visual selections", () => {
+  let rendered: readonly string[] = [];
+  let snapshot: string[] = [];
+  class FrozenRender extends CustomEditor {
+    override render(width: number) {
+      const lines = super.render(width);
+      snapshot = [...lines];
+      rendered = Object.freeze(lines);
+      return rendered as string[];
+    }
+  }
+  const { editor, type } = setup("bottom-right", FrozenRender);
+  type(..."foo bar", "\x1b", "0", "v", "e");
+  const visual = editor.render(40);
+  expect(visual).not.toBe(rendered);
+  expect(visual[1]).toStartWith("\x1b[7mfo");
+  expect(visual[1]).toContain("\x1b[27m bar");
+  expect(rendered).toEqual(snapshot);
+  expect(rendered[1]).not.toContain("\x1b[27m");
+  type("\x1b");
+  const normal = editor.render(40);
+  expect(normal).toBe(rendered);
+  expect(normal[1]).not.toContain("\x1b[27m");
+});
+
 test("inserts and appends on every line of a block", () => {
   const { editor, type } = setup();
   editor.setText("ab\ncd");
